@@ -1,458 +1,1105 @@
 # ELFscope
 
-ELFscope is a static ELF triage utility for defensive reverse engineering on Linux. It analyses ELF binaries without executing them and produces a compact, structured view of file identity, ELF metadata, security hardening, dynamic dependencies, symbols, strings, entropy, and explainable triage signals.
+### Static ELF Triage for Defensive Reverse Engineering
 
-The project is designed to provide a fast and reproducible first-pass analysis before deeper reverse engineering or forensic investigation.
+ELFscope is a static ELF analysis and triage utility for Linux, designed to help analysts understand a binary before moving into deeper reverse engineering.
 
-## What it does
+It analyses ELF files as static data and produces structured information about their format, memory layout, sections, segments, symbols, relocations, dynamic linking, hardening properties, strings, entropy, notes, entry points, and structural indicators.
 
-ELFscope analyses an ELF file and reports:
+The primary goal is simple:
 
-* ELF class, endianness, machine architecture, file type, entry point, and interpreter;
-* sections, program segments, and ELF notes;
-* dynamic dependencies;
-* imported and exported symbols;
-* common binary-hardening indicators including RELRO, NX, PIE, stack-canary symbols, RPATH, RUNPATH, and FORTIFY-related imports;
-* MD5, SHA-1, and SHA-256 file hashes;
-* Shannon entropy for the complete file and individual sections;
-* printable ASCII strings for quick triage;
-* executable-stack and W+X segment or section indicators;
-* selected suspicious or noteworthy imported APIs;
-* unusual section-name indicators;
-* stripped-symbol indicators;
-* machine-readable JSON reports;
-* human-readable Markdown reports.
+> **Understand the ELF before diving deeper.**
 
-ELFscope is intentionally static. It does not execute the analysed file, inject into processes, modify binaries, contact remote targets, or perform exploitation.
+ELFscope does not execute the inspected binary and does not attempt to replace specialised reverse-engineering tools. Instead, it provides a focused first-pass analysis layer that helps determine what should be investigated next.
 
-## Why ELFscope exists
+---
 
-A full reverse-engineering workflow normally involves several specialised tools.
+## Features
 
-Examples include:
+ELFscope v0.2.0 provides three analysis levels.
 
-* `file` for basic file identification;
-* `readelf` for ELF metadata;
-* `objdump` for low-level inspection;
-* `nm` for symbol information;
-* `strings` for printable strings;
-* `checksec` for common hardening properties;
-* disassemblers and decompilers for deeper static analysis;
-* debuggers and tracing tools for controlled dynamic analysis.
+### 1. Quick Triage
 
-ELFscope does not attempt to replace these tools.
+Fast first-pass inspection for identifying a binary and reviewing the most important security and structural properties.
 
-Instead, it provides a small, scriptable aggregation layer for the first stage of an investigation. The goal is to reduce repetitive commands, preserve analysis results in a structured format, and make the initial triage process easier to reproduce.
-
-## Design principles
-
-ELFscope follows several principles:
-
-### Static first
-
-The inspected file is treated as data. ELFscope does not execute the target binary.
-
-### Explainable signals
-
-A signal should identify the observed condition rather than claim a definitive malware classification.
-
-For example, high entropy may indicate compressed or encrypted data, but it can also occur in legitimate software. Likewise, imports such as `ptrace`, `mprotect`, or `dlopen` can have legitimate uses.
-
-### Conservative interpretation
-
-Unknown information is reported as unknown instead of being converted into a false security claim.
-
-### Scriptable output
-
-JSON is provided so that other programs can consume ELFscope results without parsing terminal output.
-
-### Small scope
-
-The project focuses on ELF triage rather than attempting to become a complete reverse-engineering framework.
-
-## Requirements
-
-ELFscope currently targets Linux systems and supports ELF binaries.
-
-The project uses Python and `pyelftools` for ELF parsing.
-
-On Arch Linux:
-
-```bash
-sudo pacman -S python python-pyelftools
+```text
+[1] Quick Triage
 ```
 
-Other Linux distributions should install the equivalent Python and `pyelftools` packages through their native package manager or Python environment.
+Includes:
 
-## Running ELFscope
+* file identity and cryptographic hashes;
+* ELF class and architecture;
+* endianness;
+* object type;
+* entry point;
+* interpreter;
+* common hardening properties;
+* imported libraries;
+* imported symbols;
+* printable strings;
+* entropy;
+* explainable triage signals.
 
-From a source checkout:
+---
 
-```bash
-./run.sh /bin/ls
+### 2. Deep ELF Analysis
+
+A structural ELF analysis intended for analysts preparing for deeper reverse engineering.
+
+```text
+[2] Deep ELF Analysis
 ```
 
-Or:
+Includes:
 
-```bash
-python -m elfscope /bin/ls
+* complete ELF header information;
+* program headers;
+* section headers;
+* section-to-segment relationships;
+* dynamic tags;
+* shared-library dependencies;
+* symbols;
+* relocations;
+* ELF notes;
+* GNU Build-ID where available;
+* debug-information indicators;
+* hardening properties;
+* structural observations.
+
+---
+
+### 3. Full Static Analysis
+
+The most comprehensive analysis mode available in the current release.
+
+```text
+[3] Full Static Analysis
 ```
 
-To display the version:
+Combines deep ELF analysis with additional static triage capabilities such as:
+
+* entry-point resolution;
+* entry-point section and segment mapping;
+* entry-point file offset;
+* entry-point bytes;
+* section and file entropy;
+* structural anomaly checks;
+* possible trailing-data indicators;
+* optional entry-point disassembly;
+* extended triage signals;
+* complete analysis statistics.
+
+All analysis remains static.
+
+---
+
+# CLI Usage
+
+Run ELFscope against an ELF file:
+
+```bash
+./run.sh ./sample
+```
+
+Interactive mode presents:
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│                       ELFscope v0.2.0                       │
+│      Static ELF Triage for Defensive Reverse Engineering   │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  [1] ⚡ Quick Triage                                         │
+│      Fast first-pass binary inspection                      │
+│                                                              │
+│  [2] 🔬 Deep ELF Analysis                                   │
+│      Structural ELF and reverse-engineering analysis         │
+│                                                              │
+│  [3] 🧪 Full Static Analysis                                │
+│      Deep analysis + entry-point + anomaly inspection       │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+Choose analysis [1/2/3]:
+```
+
+A mode can also be selected directly:
+
+```bash
+./run.sh ./sample --mode 1
+```
+
+```bash
+./run.sh ./sample --mode 2
+```
+
+```bash
+./run.sh ./sample --mode 3
+```
+
+Display the version:
 
 ```bash
 ./run.sh --version
 ```
 
-## Generating reports
-
-JSON:
+Display command help:
 
 ```bash
-./run.sh /bin/ls \
-  --json reports/ls.json
+./run.sh --help
 ```
 
-Markdown:
+---
 
-```bash
-./run.sh /bin/ls \
-  --markdown reports/ls.md
-```
+# Recommended Workflow
 
-Both:
-
-```bash
-./run.sh /bin/ls \
-  --json reports/ls.json \
-  --markdown reports/ls.md
-```
-
-The generated JSON is intended for automation, while Markdown is intended for human-readable investigation notes and case documentation.
-
-## Example workflow
-
-A simple defensive triage workflow is:
+ELFscope is intended to sit at the beginning of a reverse-engineering workflow.
 
 ```text
-preserve sample
-      ↓
-record SHA-256
-      ↓
-run ELFscope
-      ↓
-review ELF metadata
-      ↓
-review hardening
-      ↓
-review dependencies and symbols
-      ↓
-review strings and entropy
-      ↓
-review triage signals
-      ↓
-decide whether deeper analysis is required
+                    ┌──────────────────┐
+                    │     ELF file     │
+                    └────────┬─────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │     ELFscope     │
+                    │   static triage  │
+                    └────────┬─────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+              ▼              ▼              ▼
+          Identity        Structure      Signals
+              │              │              │
+              └──────────────┼──────────────┘
+                             │
+                             ▼
+                   Investigation plan
+                             │
+              ┌──────────────┼──────────────┐
+              ▼              ▼              ▼
+           readelf         objdump          nm
+              │
+              ├──────────► disassembler
+              │
+              ├──────────► decompiler
+              │
+              └──────────► debugger
 ```
 
-A typical investigation might therefore begin with:
-
-```bash
-sha256sum sample
-./run.sh sample \
-  --json reports/sample.json \
-  --markdown reports/sample.md
-```
-
-The resulting report can be retained together with the original evidence and investigation notes.
-
-## Security semantics
-
-### RELRO
-
-ELFscope checks for the GNU `PT_GNU_RELRO` segment and related bind-now semantics.
-
-The result is reported as:
-
-* `full` when RELRO and immediate binding semantics are detected;
-* `partial` when a RELRO segment exists without detected immediate binding;
-* `none` when no RELRO segment is detected;
-* `unknown` when the available ELF metadata is insufficient to make the determination.
-
-These results describe observed ELF properties. They do not prove that a binary is safe or unsafe.
-
-### NX
-
-The Linux `PT_GNU_STACK` program segment communicates the intended stack execution policy.
-
-ELFscope reports:
-
-* `enabled` when the stack segment is present without the execute flag;
-* `disabled` when the execute flag is present;
-* `unknown` when the required segment information is unavailable.
-
-An unknown result is intentionally not interpreted as a positive or negative security claim.
-
-### PIE
-
-ELFscope distinguishes between position-independent executables and ordinary shared objects.
-
-For an executable:
-
-* `ET_EXEC` is reported as `disabled`;
-* `ET_DYN` with a program interpreter is reported as `enabled`.
-
-A plain `ET_DYN` shared object is reported as `shared-object` instead of incorrectly labelling it as a PIE executable.
-
-### Stack canaries
-
-The first release checks for imported symbols such as:
+A practical workflow is:
 
 ```text
+1. Preserve the original sample.
+2. Record its cryptographic hash.
+3. Run ELFscope.
+4. Review the ELF structure.
+5. Review hardening properties.
+6. Review dependencies, symbols, and relocations.
+7. Inspect the entry point.
+8. Review structural anomalies and triage signals.
+9. Decide which deeper analysis technique is appropriate.
+10. Continue with specialised reverse-engineering tools.
+```
+
+ELFscope is the preparation layer, not the entire reverse-engineering workflow.
+
+---
+
+# ELF Analysis
+
+## ELF Header
+
+ELFscope extracts structural information from the ELF header, including:
+
+```text
+Class
+Data / Endianness
+OS ABI
+ABI Version
+Object Type
+Machine Architecture
+Entry Point
+Program Header Offset
+Section Header Offset
+ELF Header Size
+Program Header Entry Size
+Program Header Count
+Section Header Entry Size
+Section Header Count
+Section String Table Index
+Flags
+```
+
+These fields establish the basic structure and layout of the binary.
+
+---
+
+## Program Headers
+
+Program headers describe segments used by the loader and provide information about how relevant portions of an ELF file are mapped into memory.
+
+ELFscope inspects segment types including:
+
+```text
+PT_LOAD
+PT_INTERP
+PT_DYNAMIC
+PT_NOTE
+PT_GNU_STACK
+PT_GNU_RELRO
+PT_GNU_EH_FRAME
+```
+
+For program segments, ELFscope can report:
+
+```text
+Type
+File Offset
+Virtual Address
+File Size
+Memory Size
+Flags
+Alignment
+```
+
+This is useful for examining:
+
+* executable mappings;
+* writable mappings;
+* W+X conditions;
+* stack-execution policy;
+* memory layout;
+* dynamic linking;
+* loader-related metadata.
+
+---
+
+# Sections
+
+ELFscope enumerates ELF sections and reports properties including:
+
+```text
+Name
+Type
+Address
+File Offset
+Size
+Flags
+Entropy
+```
+
+Common sections include:
+
+```text
+.text
+.rodata
+.data
+.bss
+.symtab
+.strtab
+.dynsym
+.dynstr
+.rela.dyn
+.rela.plt
+.init
+.fini
+.init_array
+.fini_array
+.debug_*
+```
+
+Section information helps identify executable code, read-only data, writable data, symbol information, relocation data, and debugging metadata.
+
+---
+
+# Section-to-Segment Mapping
+
+Sections describe the logical organisation of the ELF file, while segments describe portions relevant to program loading.
+
+ELFscope analyses their relationship.
+
+Example:
+
+```text
+PT_LOAD #0  R E
+ ├── .text
+ ├── .rodata
+ └── .eh_frame
+
+PT_LOAD #1  RW
+ ├── .data
+ ├── .bss
+ └── .got
+```
+
+This mapping is useful for identifying:
+
+* executable sections;
+* writable sections;
+* W+X mappings;
+* unusual section placement;
+* loader-oriented anomalies;
+* inconsistencies between logical and loadable layouts.
+
+---
+
+# Dynamic Information
+
+When dynamic linking is present, ELFscope inspects the dynamic section and related metadata.
+
+Examples include:
+
+```text
+DT_NEEDED
+DT_SONAME
+DT_RPATH
+DT_RUNPATH
+DT_PLTGOT
+DT_PLTRELSZ
+DT_PLTREL
+DT_RELA
+DT_RELASZ
+DT_REL
+DT_RELSZ
+DT_BIND_NOW
+DT_FLAGS
+DT_FLAGS_1
+```
+
+This provides context about shared-library dependencies and dynamic loader behaviour.
+
+---
+
+# Shared Libraries
+
+ELFscope reports dynamic dependencies when available.
+
+Example:
+
+```text
+Dynamic Libraries
+
+  libc.so.6
+  libdl.so.2
+  libpthread.so.0
+```
+
+This can help determine whether a binary is dynamically linked and which runtime components may be relevant to further analysis.
+
+---
+
+# Symbols
+
+ELFscope analyses static and dynamic symbol tables when available.
+
+Symbol information may include:
+
+```text
+Name
+Address
+Size
+Binding
+Type
+Visibility
+Section
+Defined / Undefined
+```
+
+Examples:
+
+```text
+_start
+main
+malloc
+printf
+dlopen
+mprotect
 __stack_chk_fail
 ```
 
-This is useful evidence that stack-protection mechanisms may be present.
+Symbol availability also provides useful evidence about stripping and build configuration.
 
-It is not proof that every function in the binary is protected.
+---
+
+# Relocations
+
+ELFscope inspects relocation information when present.
+
+Relevant structures include:
+
+```text
+REL
+RELA
+RELR
+JMPREL
+```
+
+Relocation analysis helps explain how symbolic references and runtime addresses are expected to be resolved.
+
+This is particularly useful for investigating:
+
+* dynamic linking;
+* PLT/GOT behaviour;
+* imported functions;
+* position-independent code;
+* unusual relocation layouts.
+
+---
+
+# ELF Notes
+
+ELF notes can contain identification, ABI, build, and toolchain-related information.
+
+ELFscope can inspect information such as:
+
+```text
+GNU Build-ID
+ABI information
+GNU properties
+Other ELF notes
+```
+
+A Build-ID may help correlate a binary with:
+
+* another copy of the same build;
+* debugging information;
+* package artefacts;
+* external analysis records.
+
+---
+
+# Entry-Point Analysis
+
+The ELF entry point is an important starting location for static reverse engineering.
+
+ELFscope attempts to resolve:
+
+```text
+Virtual Address
+Containing Section
+Containing Segment
+File Offset
+Entry-Point Bytes
+```
+
+Example:
+
+```text
+Entry Point
+────────────────────────────────────────
+
+Virtual Address : 0x08048060
+Section         : .text
+File Offset     : 0x00000060
+Segment         : PT_LOAD #0
+
+Bytes:
+31 c0 40 cd 80
+```
+
+When optional disassembly support is available, ELFscope can decode a bounded instruction region around the entry point.
+
+This gives the analyst an immediate starting point before moving into a full disassembler or decompiler.
+
+---
+
+# Debug Information
+
+ELFscope identifies the presence of relevant debug-information structures, including:
+
+```text
+.debug_info
+.debug_line
+.debug_abbrev
+.debug_str
+.gnu_debuglink
+```
+
+The presence or absence of debugging information can help determine how much symbolic and source-level context may be available during deeper analysis.
+
+---
+
+# Security Hardening
+
+ELFscope reports common ELF hardening properties.
+
+### RELRO
+
+```text
+FULL
+PARTIAL
+NONE
+```
+
+### NX / Stack Execution
+
+```text
+ENABLED
+DISABLED
+UNKNOWN
+```
+
+### PIE
+
+```text
+ENABLED
+DISABLED
+SHARED OBJECT
+NOT APPLICABLE
+```
+
+### Stack Canary
+
+```text
+PRESENT
+NOT DETECTED
+```
 
 ### FORTIFY
 
-ELFscope identifies imported symbols ending in:
+ELFscope identifies selected `_chk` imports as static evidence of FORTIFY-related interfaces.
 
-```text
-_chk
-```
+These checks describe observed binary properties. They are not a complete security certification.
 
-This provides a conservative indication of FORTIFY-related interfaces.
+---
 
-It is not a complete audit of compiler flags, libc configuration, or source-level protection.
-
-### Entropy
+# Entropy
 
 ELFscope calculates Shannon entropy for:
 
 * the complete file;
-* individual ELF sections.
+* individual sections.
 
-Higher entropy can be associated with compressed or encrypted content, but it can also occur naturally in compiled binaries and data.
+Entropy is reported on a scale of:
 
-Therefore, ELFscope treats entropy as a triage signal rather than a malware or packer verdict.
+```text
+0.0 ───────────────────────────── 8.0
+```
 
-## Triage signals
+High entropy can occur in:
 
-ELFscope produces explainable signals for conditions such as:
+* compressed data;
+* encrypted data;
+* packed content;
+* generated data;
+* ordinary compiled data.
 
-* executable stacks;
-* writable and executable segments;
-* writable and executable sections;
-* missing RELRO;
+Therefore:
+
+> **High entropy is a triage signal, not proof of packing or maliciousness.**
+
+---
+
+# Strings
+
+ELFscope extracts printable ASCII strings for quick triage.
+
+Strings can expose useful artefacts such as:
+
+```text
+file paths
+URLs
+error messages
+library names
+configuration values
+command fragments
+format strings
+debug messages
+```
+
+String results should be interpreted together with ELF metadata and other evidence.
+
+---
+
+# Structural Anomalies
+
+ELFscope can identify conditions that may warrant closer inspection, including:
+
+```text
+Executable and writable segments
+Executable and writable sections
+Entry point outside expected executable content
+Unexpected section placement
+Suspicious offsets
+Segment/file-size inconsistencies
+Unusual alignment
+Missing expected structures
+Potential trailing data
+```
+
+An anomaly indicates something worth investigating. It is not an automatic malware or vulnerability verdict.
+
+---
+
+# Triage Signals
+
+ELFscope produces explainable signals rather than attempting to classify a binary as simply “safe” or “malicious”.
+
+Example:
+
+```text
+[HIGH]   EXECUTABLE_STACK
+[MEDIUM] RELRO_NONE
+[LOW]    NO_PIE
+[INFO]   INTERESTING_IMPORT
+[INFO]   HIGH_ENTROPY
+```
+
+Each signal should answer:
+
+```text
+What was observed?
+Why might it matter?
+What should be investigated next?
+```
+
+Static indicators always require context.
+
+A legitimate program can contain:
+
+* high-entropy data;
+* dynamic loading;
+* `mprotect`;
+* `ptrace`;
 * stripped symbols;
-* high entropy;
-* unusual section names;
-* selected dynamic imports associated with behaviours that may warrant investigation.
-
-A signal does not mean that a binary is malicious.
-
-For example, a legitimate application may:
-
-* use dynamic loading;
-* change memory permissions;
-* use debugging interfaces;
-* contain compressed resources;
-* remove symbols for release builds;
-* use unusual section names.
+* unusual section names.
 
 Likewise, the absence of a signal does not prove that a binary is benign.
 
-ELFscope is intended to help an analyst decide what to inspect next.
+---
 
-## Output model
+# Output Formats
 
-JSON output is structured for programmatic use.
+ELFscope supports terminal output and structured report generation.
 
-The top-level structure includes:
-
-```text
-tool
-file
-elf
-symbols
-security
-statistics
-strings
-signals
-```
-
-A signal contains fields such as:
-
-```text
-severity
-code
-message
-```
-
-The design goal is to provide enough context for another program or analyst to understand why the signal was generated without relying on terminal formatting.
-
-## Architecture
-
-The current project is intentionally small:
-
-```text
-elfscope/
-├── src/
-│   └── elfscope/
-│       ├── __init__.py
-│       ├── __main__.py
-│       ├── analysis.py
-│       └── cli.py
-├── tests/
-├── examples/
-├── docs/
-├── packaging/
-├── pyproject.toml
-├── Makefile
-└── run.sh
-```
-
-The analysis layer is kept separate from the CLI so that the underlying functionality can be reused by other Python programs in the future.
-
-## Testing
-
-Install development and test dependencies:
+## JSON
 
 ```bash
-python -m pip install -e '.[test]'
+./run.sh ./sample \
+  --mode 3 \
+  --json reports/sample.json
 ```
 
-Then run:
+JSON output is intended for:
+
+* automation;
+* analysis scripts;
+* SIEM or case-management pipelines;
+* reproducible investigations;
+* future integrations.
+
+---
+
+## Markdown
+
+```bash
+./run.sh ./sample \
+  --mode 3 \
+  --markdown reports/sample.md
+```
+
+Markdown reports are useful for:
+
+* investigation notes;
+* technical documentation;
+* incident-response records;
+* research;
+* sharing analysis results.
+
+Generate both:
+
+```bash
+./run.sh ./sample \
+  --mode 3 \
+  --json reports/sample.json \
+  --markdown reports/sample.md
+```
+
+---
+
+# Installation
+
+## Arch Linux
+
+### Required Packages
+
+ELFscope's core analysis requires:
+
+```bash
+sudo pacman -S python python-pyelftools
+```
+
+Core components:
+
+```text
+🐍 Python
+🔬 pyelftools
+```
+
+`pyelftools` provides ELF and DWARF parsing.
+
+### Optional Disassembly Support
+
+For optional Capstone-based static disassembly:
+
+```bash
+sudo pacman -S python-capstone
+```
+
+Without Capstone, the core ELF analysis remains available.
+
+### Development and Testing
+
+To run the test suite:
+
+```bash
+sudo pacman -S python-pytest
+```
+
+Then:
 
 ```bash
 make check
 ```
 
-The test suite currently covers:
+### Recommended Development Setup
 
-* entropy calculations;
-* printable-string extraction;
-* CLI version handling;
-* basic analysis behaviour.
+```bash
+sudo pacman -S \
+    python \
+    python-pyelftools \
+    python-capstone \
+    python-pytest
+```
 
-Future releases can expand this into fixture-driven tests covering multiple ELF architectures, hardening configurations, stripped/unstripped binaries, malformed files, and uncommon ELF layouts.
+Verify the environment:
 
-## Packaging
+```bash
+python --version
+```
 
-ELFscope is intentionally distribution-independent.
+```bash
+python -c "import elftools; print('pyelftools: OK')"
+```
 
-The core project does not require AUR, BlackArch, Kali, Debian, Fedora, or any other specific Linux distribution.
+```bash
+python -c "import capstone; print('capstone: OK')"
+```
 
-Distribution packaging can be maintained separately from the core source tree.
+```bash
+python -c "import pytest; print('pytest: OK')"
+```
 
-Possible future packaging targets include:
+Then:
 
-* Arch Linux / AUR;
-* BlackArch;
-* Debian-based distributions;
-* Fedora;
-* standalone Python environments;
-* containers.
+```bash
+./run.sh --version
+./run.sh ./start --mode 3
+make check
+```
 
-The project should remain fully usable without any of these packaging ecosystems.
+---
 
-## Scope
+# Testing
+
+Run syntax checks:
+
+```bash
+python -m py_compile src/elfscope/analysis.py
+python -m py_compile src/elfscope/cli.py
+```
+
+Run the test suite:
+
+```bash
+make check
+```
+
+Recommended test coverage includes:
+
+```text
+ELF32
+ELF64
+static ELF
+dynamically linked ELF
+stripped ELF
+unstripped ELF
+PIE executable
+non-PIE executable
+hardened executable
+minimal ELF
+malformed ELF fixtures
+```
+
+Small handcrafted ELF samples are particularly useful because they expose assumptions that may remain invisible when testing only against large system binaries.
+
+---
+
+# Project Structure
+
+```text
+elfscope/
+├── 📁 docs/
+│   ├── design.md
+│   └── research.md
+│
+├── 📁 examples/
+│   ├── hello.c
+│   ├── Makefile
+│   └── README.md
+│
+├── 📁 packaging/
+│
+├── 📁 scripts/
+│
+├── 📁 src/
+│   └── elfscope/
+│       ├── __init__.py
+│       ├── __main__.py
+│       ├── analysis.py
+│       └── cli.py
+│
+├── 📁 tests/
+│   ├── test_analysis.py
+│   └── test_cli.py
+│
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── LICENSE
+├── Makefile
+├── pyproject.toml
+├── README.md
+├── run.sh
+└── SECURITY.md
+```
+
+---
+
+# Architecture
+
+ELFscope is intentionally divided into analysis and presentation layers.
+
+```text
+                 ┌─────────────────────┐
+                 │      ELF file       │
+                 └──────────┬──────────┘
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │   Analysis Engine   │
+                 │                     │
+                 │ ELF parsing         │
+                 │ Sections            │
+                 │ Segments             │
+                 │ Symbols              │
+                 │ Relocations          │
+                 │ Dynamic information  │
+                 │ Notes                │
+                 │ Security properties  │
+                 │ Triage signals       │
+                 └──────────┬──────────┘
+                            │
+                ┌───────────┴───────────┐
+                │                       │
+                ▼                       ▼
+        ┌───────────────┐       ┌───────────────┐
+        │ CLI Renderer  │       │ Report Output │
+        │               │       │               │
+        │ Terminal      │       │ JSON          │
+        │ Quick/Deep/   │       │ Markdown      │
+        │ Full          │       │               │
+        └───────────────┘       └───────────────┘
+```
+
+The separation allows the analysis engine to remain reusable independently of the terminal interface.
+
+---
+
+# Dependencies
+
+| Package             | Status      | Purpose            |
+| ------------------- | ----------- | ------------------ |
+| `python`            | Required    | Runtime            |
+| `python-pyelftools` | Required    | ELF/DWARF parsing  |
+| `python-capstone`   | Optional    | Static disassembly |
+| `python-pytest`     | Development | Test suite         |
+
+ELFscope deliberately keeps the core dependency set small.
+
+A full reverse-engineering suite is not required.
+
+---
+
+# Scope
 
 ELFscope currently focuses on ELF binaries used on Linux and Unix-like systems.
 
-The project does not currently attempt to provide:
+The project does not attempt to provide:
 
-* disassembly;
 * decompilation;
+* full-featured disassembly;
 * debugging;
 * dynamic tracing;
 * sandboxing;
-* malware execution;
 * exploit development;
 * remote scanning;
 * process injection;
 * binary patching;
 * automated exploitation.
 
-Those areas are deliberately outside the scope of the first releases.
+These capabilities belong to specialised tools and are deliberately outside the core scope.
 
-## Limitations
+---
 
-Static analysis has inherent limitations.
+# Limitations
 
-A binary can behave differently at runtime because of:
+Static analysis cannot completely describe runtime behaviour.
+
+A binary may behave differently because of:
 
 * environment variables;
-* configuration files;
+* configuration;
 * dynamically loaded libraries;
+* runtime-generated code;
 * network conditions;
 * user interaction;
-* runtime-generated code;
 * kernel behaviour;
 * anti-analysis mechanisms.
 
-ELFscope therefore should be considered a triage tool rather than a complete verdict engine.
+ELFscope should therefore be treated as a **triage and investigation-preparation tool**, not a final behavioural verdict engine.
 
-Indicators must always be interpreted in context.
+---
 
-## Defensive use
+# Defensive Use
 
-ELFscope is intended for legitimate defensive activities such as:
+ELFscope is intended for legitimate defensive and research activities such as:
 
 * malware triage;
-* incident-response preparation;
-* software supply-chain inspection;
-* binary hardening review;
+* software inspection;
 * reverse-engineering preparation;
-* suspicious-file investigation;
-* educational ELF analysis;
-* forensic documentation.
+* binary hardening review;
+* incident response;
+* forensic analysis;
+* software supply-chain inspection;
+* educational ELF research.
 
-Only analyse binaries that you are authorised to inspect.
+Only analyse binaries you are authorised to inspect.
 
-## Development goals
+---
 
-The project can evolve in several directions while keeping the core scope focused.
+# Roadmap
 
-Potential future work includes:
+## v0.2.x
 
-* additional ELF architectures;
-* richer relocation analysis;
-* GNU build-id extraction;
-* DWARF metadata inspection;
-* compiler and linker fingerprinting;
-* improved packer heuristics;
-* more detailed symbol classification;
-* reproducible JSON schemas;
-* plugin support for custom triage rules;
-* SARIF or other machine-readable output formats;
-* integration with existing analysis workflows;
-* performance improvements for large binaries.
+Current focus:
 
-Future functionality should remain evidence-oriented and avoid turning heuristic signals into unsupported conclusions.
+```text
+✅ Multi-level CLI analysis
+✅ Quick / Deep / Full modes
+✅ Extended ELF metadata
+✅ Program headers
+✅ Section analysis
+✅ Section-to-segment mapping
+✅ Dynamic information
+✅ Symbols
+✅ Relocations
+✅ ELF notes
+✅ Hashes
+✅ Entropy
+✅ Strings
+✅ Hardening checks
+✅ Entry-point inspection
+✅ Structural triage
+✅ JSON reports
+✅ Markdown reports
+✅ Optional disassembly support
+```
 
-## References
+## Future Work
 
-* GNU Binutils `readelf`
+Potential future improvements include:
+
+```text
+🔬 richer relocation analysis
+🧠 improved symbol classification
+📝 deeper DWARF inspection
+🔐 expanded GNU property analysis
+🎯 improved entry-point analysis
+🧮 architecture-aware heuristics
+🧩 stronger anomaly detection
+📊 versioned JSON schemas
+🔌 extensible analysis rules
+⚙️ performance improvements for large binaries
+```
+
+Future features should preserve the project's central principle:
+
+> **Understand the ELF before diving deeper.**
+
+---
+
+# Contributing
+
+Contributions are welcome.
+
+Useful contributions include:
+
+* ELF parser improvements;
+* architecture support;
+* test fixtures;
+* analysis rules;
+* false-positive reduction;
+* malformed-ELF handling;
+* documentation;
+* reporting improvements;
+* performance improvements.
+
+Please read:
+
+```text
+CONTRIBUTING.md
+SECURITY.md
+```
+
+before submitting changes.
+
+---
+
+# References
+
+* GNU Binutils
+  https://sourceware.org/binutils/
+
+* GNU `readelf`
   https://sourceware.org/binutils/docs/binutils/readelf.html
 
-* Linux `elf(5)`
+* Linux ELF specification
   https://man7.org/linux/man-pages/man5/elf.5.html
-
-* Linux UAPI ELF definitions
-  https://github.com/torvalds/linux/blob/master/include/uapi/linux/elf.h
 
 * pyelftools
   https://github.com/eliben/pyelftools
 
-* LIEF ELF documentation
-  https://lief.re/doc/latest/formats/elf/
+* Capstone
+  https://www.capstone-engine.org/
 
-* checksec
-  https://github.com/slimm609/checksec
+---
 
-## Licence
+# License
 
-MIT. See `LICENSE`.
+MIT License.
+
+See [`LICENSE`](LICENSE).
+
+---
+
+<div align="center">
+
+## 🔬 ELFscope v0.2.0
+
+**Static ELF Triage for Defensive Reverse Engineering**
+
+`inspect → understand → investigate`
+
+</div>
